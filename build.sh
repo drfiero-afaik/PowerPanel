@@ -28,9 +28,11 @@ swiftc -O \
 echo "Signing PanelPower.app..."
 codesign --force --deep --sign - "$APP_DIR"
 
-echo "Packaging PanelPower-macOS.zip..."
-rm -f "$DIR/PanelPower-macOS.zip"
-(cd "$DIR" && zip -r -q "PanelPower-macOS.zip" "PanelPower.app" "Tuya_Zigbee_Metering_Plug.groovy" "HOW_TO_INSTALL.txt" -x "*.DS_Store")
+echo "Packaging PanelPower-macOS-v1.1.0.zip..."
+cp -f "$DIR/Tuya_Zigbee_Metering_Plug.groovy" "$DIR/Tuya_Zigbee_Metering_Plug_v2.2.2.groovy"
+rm -f "$DIR/PanelPower-macOS.zip" "$DIR/PanelPower-macOS-v1.1.0.zip"
+(cd "$DIR" && zip -r -q "PanelPower-macOS-v1.1.0.zip" "PanelPower.app" "Tuya_Zigbee_Metering_Plug_v2.2.2.groovy" "HOW_TO_INSTALL.txt" -x "*.DS_Store")
+cp -f "$DIR/PanelPower-macOS-v1.1.0.zip" "$DIR/PanelPower-macOS.zip"
 
 echo "Installing to /Applications/PanelPower.app..."
 rm -rf /Applications/PanelPower.app

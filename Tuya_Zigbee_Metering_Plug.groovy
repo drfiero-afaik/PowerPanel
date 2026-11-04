@@ -75,6 +75,7 @@
  *  ver. 2.1.1 2026-08-29 kkossev - fixed 2.1.0 bug: null device NPE in getTuyaMultiChannelProfile() on save; added unverified SPM01V2.5 _TZE284_iwn0gpzz support
  *  ver. 2.2.0 2026-11-03 Dr.Fiero - added dual-phase PJ-1203A attributes (power_a, power_b, power_ab, amperage_a, amperage_b, powerA, powerB, amperageA, amperageB)
  *  ver. 2.2.1 2026-11-04 Dr.Fiero - fixed PJ-1203A total power (DP 115 / power_ab) flipping negative; updated importUrl to PowerPanel repo
+ *  ver. 2.2.2 2026-11-04 Dr.Fiero - added 5s event cooldown & threshold filtering for PJ-1203A dual-phase attributes to stop Hubitat excessive-event warnings and log spam
  *
  *                                 TODO: update first post w/ TS0001 _TZ3000_kqvb5akv
  *                                 TODO: add toggle() command
@@ -95,14 +96,16 @@ import groovy.json.*
 import groovy.transform.Field
 import hubitat.zigbee.zcl.DataType
 import groovy.transform.CompileStatic
+import java.util.concurrent.ConcurrentHashMap
 
-static String version() { '2.2.1' }
-static String timeStamp() { '2026/11/04 03:30 PM' }
+static String version() { '2.2.2' }
+static String timeStamp() { '2026/11/04 03:55 PM' }
 
 @Field static final Boolean _DEBUG = false
+@Field static final ConcurrentHashMap<String, Long> lastPhaseEventMs = new ConcurrentHashMap<String, Long>()
 
 metadata {
-    definition(name: 'Tuya Zigbee Metering Plug (Dual Phase)', namespace: 'kkossev', author: 'Krassimir Kossev', importUrl: 'https://raw.githubusercontent.com/drfiero-afaik/PowerPanel/main/Tuya_Zigbee_Metering_Plug.groovy', singleThreaded: true ) {
+    definition(name: 'Tuya Zigbee Metering Plug (Dual Phase v2.2.2)', namespace: 'kkossev', author: 'Krassimir Kossev', importUrl: 'https://raw.githubusercontent.com/drfiero-afaik/PowerPanel/main/Tuya_Zigbee_Metering_Plug.groovy', singleThreaded: true ) {
         capability 'EnergyMeter'
         capability 'PowerMeter'
         capability 'CurrentMeter'
@@ -917,15 +920,24 @@ void powerEvent(power, boolean isDigital=false) {
         logDebug "ignored ${map.name} ${map.value} ${map.unit} (exceeds maximum power cap ${MAX_POWER} W)"
         return
     }
-    if ((Math.abs((power as int) - (lastPower as int)) >= (powerThreshold as int)) || optimizations == false || state.isRefreshRequest == true) {
+    int effThreshold = isPJ1203A() ? Math.max((powerThreshold ?: 5) as int, 5) : ((powerThreshold ?: 1) as int)
+    String throttleKey = "${device.id}_power"
+    long nowMs = now()
+    long lastMs = lastPhaseEventMs.getOrDefault(throttleKey, 0L)
+    if (isPJ1203A() && state.isRefreshRequest != true && (nowMs - lastMs) < 5000L) {
+        logDebug "throttled power (${power} W) - within 5s cooldown"
+        return
+    }
+    if ((Math.abs((power as int) - (lastPower as int)) >= effThreshold) || optimizations == false || state.isRefreshRequest == true) {
         if (settings?.reportPower == true) {
+            lastPhaseEventMs.put(throttleKey, nowMs)
             logInfo "${map.descriptionText}"
             sendEvent(map)
-            runIn(1, formatAttrib, [overwrite: true])
+            runIn(5, formatAttrib, [overwrite: true])
         }
     }
     else {
-        logDebug "ignored ${map.name} ${map.value} ${map.unit} (change from ${lastPower} is less than ${powerThreshold} W)"
+        logDebug "ignored ${map.name} ${map.value} ${map.unit} (change from ${lastPower} is less than ${effThreshold} W)"
     }
 }
 
@@ -944,15 +956,41 @@ void amperageEvent(amperage, boolean isDigital=false) {
     if (state.isRefreshRequest == true) { map.descriptionText += ' (refresh)' }
     /* groovylint-disable-next-line NoDef */
     def lastAmperage = device.currentValue('amperage', true) ?: 0.0
-    if ((Math.abs((amperage * 1000 as int) - (lastAmperage * 1000 as int)) >= (amperageThreshold as int)) || optimizations == false || state.isRefreshRequest == true) {
+    int effAmpThreshold = isPJ1203A() ? Math.max((amperageThreshold ?: 50) as int, 50) : ((amperageThreshold ?: 25) as int)
+    String throttleKey = "${device.id}_amperage"
+    long nowMs = now()
+    long lastMs = lastPhaseEventMs.getOrDefault(throttleKey, 0L)
+    if (isPJ1203A() && state.isRefreshRequest != true && (nowMs - lastMs) < 5000L) {
+        logDebug "throttled amperage (${amperage} A) - within 5s cooldown"
+        return
+    }
+    if ((Math.abs((amperage * 1000 as int) - (lastAmperage * 1000 as int)) >= effAmpThreshold) || optimizations == false || state.isRefreshRequest == true) {
         if (settings?.reportAmperage == true) {
+            lastPhaseEventMs.put(throttleKey, nowMs)
             logInfo "${map.descriptionText}"
             sendEvent(map)
-            runIn(1, formatAttrib, [overwrite: true])
+            runIn(5, formatAttrib, [overwrite: true])
         }
     }
     else {
-        logDebug "ignored ${map.name} ${map.value} ${map.unit} (change from ${lastAmperage} is less than ${amperageThreshold} mA)"
+        logDebug "ignored ${map.name} ${map.value} ${map.unit} (change from ${lastAmperage} is less than ${effAmpThreshold} mA)"
+    }
+}
+
+void emitThrottledPJ1203AEvent(String attrName, BigDecimal newVal, String unitStr, String descText, BigDecimal minDelta, long cooldownMs = 5000L) {
+    String key = "${device.id}_${attrName}"
+    long nowMs = now()
+    long lastMs = lastPhaseEventMs.getOrDefault(key, 0L)
+    BigDecimal prevVal = (device.currentValue(attrName) ?: 0.0) as BigDecimal
+    BigDecimal delta = (newVal - prevVal).abs()
+    if (state.isRefreshRequest == true || ((nowMs - lastMs) >= cooldownMs && (delta >= minDelta || optimizations == false))) {
+        lastPhaseEventMs.put(key, nowMs)
+        logInfo "${descText}"
+        Map evt = [name: attrName, value: newVal, descriptionText: descText]
+        if (unitStr) { evt.unit = unitStr }
+        sendEvent(evt)
+    } else {
+        logDebug "throttled ${attrName}=${newVal} (delta=${delta}, age=${nowMs - lastMs}ms)"
     }
 }
 
@@ -1484,12 +1522,11 @@ void parseZHAcommand(Map descMap) {
                                 }
                                 else if (isPJ1203A()) { // power_a divideBy10]
                                     BigDecimal pA = (Math.abs(value) / getPowerDiv() as BigDecimal).setScale(1, BigDecimal.ROUND_HALF_UP)
-                                    logInfo "(101) PJ1203A power_a : ${pA} W raw ($value)"
-                                    sendEvent(name: 'power_a', value: pA, unit: 'W', descriptionText: "Phase A Power is ${pA} W")
-                                    sendEvent(name: 'powerA', value: pA, unit: 'W')
-                                    BigDecimal pB = (device.currentValue('power_b') ?: device.currentValue('powerB') ?: 0.0) as BigDecimal
+                                    BigDecimal pThresh = Math.max((settings?.powerThreshold ?: 5) as BigDecimal, 5.0)
+                                    emitThrottledPJ1203AEvent('power_a', pA, 'W', "Phase A Power is ${pA} W", pThresh, 5000L)
+                                    BigDecimal pB = (device.currentValue('power_b') ?: 0.0) as BigDecimal
                                     BigDecimal pTotal = (pA + pB).setScale(1, BigDecimal.ROUND_HALF_UP)
-                                    sendEvent(name: 'power_ab', value: pTotal, unit: 'W', descriptionText: "Total Power A+B is ${pTotal} W")
+                                    emitThrottledPJ1203AEvent('power_ab', pTotal, 'W', "Total Power A+B is ${pTotal} W", pThresh, 5000L)
                                     powerEvent(pTotal)
                                 }
                                 else if (isSPM01()) {
@@ -1507,7 +1544,7 @@ void parseZHAcommand(Map descMap) {
                                     amperageEvent((value as Float) / 1000.0F)
                                 }
                                 else if (isPJ1203A()) {   // {'consuming': 0, 'producing': 1}
-                                    logInfo "(102) PJ1203A energy_flow_a : raw ($value)"
+                                    logDebug "(102) PJ1203A energy_flow_a : raw ($value)"
                                 }
                                 else if (isSPM01()) {
                                     logDebug "(102) SPM01 voltage : ${value / getVoltageDiv()} raw ($value)"
@@ -1549,16 +1586,15 @@ void parseZHAcommand(Map descMap) {
                                 }
                                 else if (isPJ1203A()) { // power_b divideBy10]
                                     BigDecimal pB = (Math.abs(value) / getPowerDiv() as BigDecimal).setScale(1, BigDecimal.ROUND_HALF_UP)
-                                    logInfo "(105) PJ1203A power_b : ${pB} W raw ($value)"
-                                    sendEvent(name: 'power_b', value: pB, unit: 'W', descriptionText: "Phase B Power is ${pB} W")
-                                    sendEvent(name: 'powerB', value: pB, unit: 'W')
-                                    BigDecimal pA = (device.currentValue('power_a') ?: device.currentValue('powerA') ?: 0.0) as BigDecimal
+                                    BigDecimal pThresh = Math.max((settings?.powerThreshold ?: 5) as BigDecimal, 5.0)
+                                    emitThrottledPJ1203AEvent('power_b', pB, 'W', "Phase B Power is ${pB} W", pThresh, 5000L)
+                                    BigDecimal pA = (device.currentValue('power_a') ?: 0.0) as BigDecimal
                                     BigDecimal pTotal = (pA + pB).setScale(1, BigDecimal.ROUND_HALF_UP)
-                                    sendEvent(name: 'power_ab', value: pTotal, unit: 'W', descriptionText: "Total Power A+B is ${pTotal} W")
+                                    emitThrottledPJ1203AEvent('power_ab', pTotal, 'W', "Total Power A+B is ${pTotal} W", pThresh, 5000L)
                                     powerEvent(pTotal)
                                 }
                                 else {
-                                    logInfo "(105) frequency : ${value} raw (${value / getFrequencyDiv()}) Hz"
+                                    logDebug "(105) frequency : ${value} raw (${value / getFrequencyDiv()}) Hz"
                                     frequencyEvent(value / getFrequencyDiv())
                                 }
                                 break
@@ -1588,9 +1624,9 @@ void parseZHAcommand(Map descMap) {
                                 }
                                 else if (isPJ1203A()) {
                                     BigDecimal pfA = (value / getPowerFactorDiv() as BigDecimal).setScale(2, BigDecimal.ROUND_HALF_UP)
-                                    logInfo "(110) PJ1203A power_factor_a : ${pfA} raw ($value)"
-                                    sendEvent(name: 'power_factor_a', value: pfA)
-                                    sendEvent(name: 'powerFactorA', value: pfA)
+                                    if (settings.reportPowerFactor == true) {
+                                        emitThrottledPJ1203AEvent('power_factor_a', pfA, null, "Phase A Power Factor is ${pfA}", 0.02, 15000L)
+                                    }
                                     powerFactorEvent(pfA)
                                 }
                                 else {
@@ -1602,7 +1638,7 @@ void parseZHAcommand(Map descMap) {
                                     logInfo "(111) Hoch Current Threshold is : ${value} raw (${value}) A"
                                 }
                                 else if (isPJ1203A()) {
-                                    logInfo "(111) frequency : ${value / getFrequencyDiv()} raw (${value}) Hz"  // divideBy100
+                                    logDebug "(111) frequency : ${value / getFrequencyDiv()} raw (${value}) Hz"  // divideBy100
                                     frequencyEvent(value / getFrequencyDiv())
                                 }
                                 else if (isSPM01()) {   // unverified
@@ -1610,7 +1646,7 @@ void parseZHAcommand(Map descMap) {
                                     powerEvent(value)
                                 }
                                 else {
-                                    logInfo "(111) power factor : ${value} raw"
+                                    logDebug "(111) power factor : ${value} raw"
                                     powerFactorEvent(value / getPowerFactorDiv())
                                 }
                                 break
@@ -1621,10 +1657,9 @@ void parseZHAcommand(Map descMap) {
                             case '71' : // (113) current_a: divideBy1000
                                 if (isPJ1203A()) {
                                     BigDecimal cA = (value / getCurrentDiv() as BigDecimal).setScale(3, BigDecimal.ROUND_HALF_UP)
-                                    logInfo "(113) PJ1203A current_a : ${cA} A raw ($value)"
-                                    sendEvent(name: 'amperage_a', value: cA, unit: 'A', descriptionText: "Phase A Current is ${cA} A")
-                                    sendEvent(name: 'amperageA', value: cA, unit: 'A')
-                                    BigDecimal cB = (device.currentValue('amperage_b') ?: device.currentValue('amperageB') ?: 0.0) as BigDecimal
+                                    BigDecimal cThresh = Math.max(((settings?.amperageThreshold ?: 50) as BigDecimal) / 1000.0, 0.05)
+                                    emitThrottledPJ1203AEvent('amperage_a', cA, 'A', "Phase A Current is ${cA} A", cThresh, 5000L)
+                                    BigDecimal cB = (device.currentValue('amperage_b') ?: 0.0) as BigDecimal
                                     BigDecimal cTotal = (cA + cB).setScale(3, BigDecimal.ROUND_HALF_UP)
                                     amperageEvent(cTotal)
                                 }
@@ -1636,10 +1671,9 @@ void parseZHAcommand(Map descMap) {
                             case '72' : // (114) current_b: divideBy1000
                                 if (isPJ1203A()) {
                                     BigDecimal cB = (value / getCurrentDiv() as BigDecimal).setScale(3, BigDecimal.ROUND_HALF_UP)
-                                    logInfo "(114) PJ1203A current_b : ${cB} A raw ($value)"
-                                    sendEvent(name: 'amperage_b', value: cB, unit: 'A', descriptionText: "Phase B Current is ${cB} A")
-                                    sendEvent(name: 'amperageB', value: cB, unit: 'A')
-                                    BigDecimal cA = (device.currentValue('amperage_a') ?: device.currentValue('amperageA') ?: 0.0) as BigDecimal
+                                    BigDecimal cThresh = Math.max(((settings?.amperageThreshold ?: 50) as BigDecimal) / 1000.0, 0.05)
+                                    emitThrottledPJ1203AEvent('amperage_b', cB, 'A', "Phase B Current is ${cB} A", cThresh, 5000L)
+                                    BigDecimal cA = (device.currentValue('amperage_a') ?: 0.0) as BigDecimal
                                     BigDecimal cTotal = (cA + cB).setScale(3, BigDecimal.ROUND_HALF_UP)
                                     amperageEvent(cTotal)
                                 }
@@ -1650,8 +1684,8 @@ void parseZHAcommand(Map descMap) {
                             case '73' : // (115) isPJ1203A() Total Power
                                 if (isPJ1203A()) {
                                     BigDecimal pAB = (Math.abs(value) / getPowerDiv() as BigDecimal).setScale(1, BigDecimal.ROUND_HALF_UP)
-                                    logInfo "(115) PJ1203A power_ab : ${pAB} W raw ($value)"
-                                    sendEvent(name: 'power_ab', value: pAB, unit: 'W', descriptionText: "Total Power A+B is ${pAB} W")
+                                    BigDecimal pThresh = Math.max((settings?.powerThreshold ?: 5) as BigDecimal, 5.0)
+                                    emitThrottledPJ1203AEvent('power_ab', pAB, 'W', "Total Power A+B is ${pAB} W", pThresh, 5000L)
                                     powerEvent(pAB)
                                 }
                                 break
@@ -1661,13 +1695,13 @@ void parseZHAcommand(Map descMap) {
                             case '79' : // (121) isPJ1203A()    divideBy100
                                 if (isPJ1203A()) {
                                     BigDecimal pfB = (value / getPowerFactorDiv() as BigDecimal).setScale(2, BigDecimal.ROUND_HALF_UP)
-                                    logInfo "(121) PJ1203A power_factor_b : ${pfB} raw ($value)"
-                                    sendEvent(name: 'power_factor_b', value: pfB)
-                                    sendEvent(name: 'powerFactorB', value: pfB)
+                                    if (settings.reportPowerFactor == true) {
+                                        emitThrottledPJ1203AEvent('power_factor_b', pfB, null, "Phase B Power Factor is ${pfB}", 0.02, 15000L)
+                                    }
                                 }
                                 break
                             case '81' : // (129) isPJ1203A()    update_frequency
-                                logInfo "(129) PJ1203A update_frequency : ${value} raw ($value)"
+                                logDebug "(129) PJ1203A update_frequency : ${value} raw ($value)"
                                 break
                                 /*
                             case '1A' : // hochFaultCode: 26
