@@ -1524,10 +1524,6 @@ void parseZHAcommand(Map descMap) {
                                     BigDecimal pA = (Math.abs(value) / getPowerDiv() as BigDecimal).setScale(1, BigDecimal.ROUND_HALF_UP)
                                     BigDecimal pThresh = Math.max((settings?.powerThreshold ?: 5) as BigDecimal, 5.0)
                                     emitThrottledPJ1203AEvent('power_a', pA, 'W', "Phase A Power is ${pA} W", pThresh, 5000L)
-                                    BigDecimal pB = (device.currentValue('power_b') ?: 0.0) as BigDecimal
-                                    BigDecimal pTotal = (pA + pB).setScale(1, BigDecimal.ROUND_HALF_UP)
-                                    emitThrottledPJ1203AEvent('power_ab', pTotal, 'W', "Total Power A+B is ${pTotal} W", pThresh, 5000L)
-                                    powerEvent(pTotal)
                                 }
                                 else if (isSPM01()) {
                                     logDebug "(101) SPM01 frequency : ${value} raw (${value / getFrequencyDiv()}) Hz"
@@ -1588,10 +1584,6 @@ void parseZHAcommand(Map descMap) {
                                     BigDecimal pB = (Math.abs(value) / getPowerDiv() as BigDecimal).setScale(1, BigDecimal.ROUND_HALF_UP)
                                     BigDecimal pThresh = Math.max((settings?.powerThreshold ?: 5) as BigDecimal, 5.0)
                                     emitThrottledPJ1203AEvent('power_b', pB, 'W', "Phase B Power is ${pB} W", pThresh, 5000L)
-                                    BigDecimal pA = (device.currentValue('power_a') ?: 0.0) as BigDecimal
-                                    BigDecimal pTotal = (pA + pB).setScale(1, BigDecimal.ROUND_HALF_UP)
-                                    emitThrottledPJ1203AEvent('power_ab', pTotal, 'W', "Total Power A+B is ${pTotal} W", pThresh, 5000L)
-                                    powerEvent(pTotal)
                                 }
                                 else {
                                     logDebug "(105) frequency : ${value} raw (${value / getFrequencyDiv()}) Hz"
@@ -1659,9 +1651,6 @@ void parseZHAcommand(Map descMap) {
                                     BigDecimal cA = (value / getCurrentDiv() as BigDecimal).setScale(3, BigDecimal.ROUND_HALF_UP)
                                     BigDecimal cThresh = Math.max(((settings?.amperageThreshold ?: 50) as BigDecimal) / 1000.0, 0.05)
                                     emitThrottledPJ1203AEvent('amperage_a', cA, 'A', "Phase A Current is ${cA} A", cThresh, 5000L)
-                                    BigDecimal cB = (device.currentValue('amperage_b') ?: 0.0) as BigDecimal
-                                    BigDecimal cTotal = (cA + cB).setScale(3, BigDecimal.ROUND_HALF_UP)
-                                    amperageEvent(cTotal)
                                 }
                                 else {
                                     logInfo "(113) Hoch Total Active Power (energy) is : ${value / getEnergyDiv()} (raw ${value}) kWh"
