@@ -1,5 +1,7 @@
 # PanelPower ⚡
 
+**Current Versions:** Mac App **`v1.1.0`** | Hubitat Driver **`v2.2.1`** *(Updated 2026-11-04)*
+
 A native, lightweight macOS Menu Bar app for monitoring **Phase A**, **Phase B**, and **Total Panel Power** from Zigbee current transformers (CT clamps) connected to **Hubitat Elevation** or **Home Assistant**.
 
 Built for macOS 14 (Sonoma) and macOS 15 (Sequoia).

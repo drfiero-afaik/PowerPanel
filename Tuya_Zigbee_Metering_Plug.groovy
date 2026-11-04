@@ -73,6 +73,8 @@
  *  ver. 2.0.4 2026-08-07 kkossev - minor bug fixes
  *  ver. 2.1.0 2026-08-29 kkossev - added Tuya multi-channel meter support (SDM02T, SPM02); fixed Tuya DP routing and ping RTT; bug fixes
  *  ver. 2.1.1 2026-08-29 kkossev - fixed 2.1.0 bug: null device NPE in getTuyaMultiChannelProfile() on save; added unverified SPM01V2.5 _TZE284_iwn0gpzz support
+ *  ver. 2.2.0 2026-11-03 Dr.Fiero - added dual-phase PJ-1203A attributes (power_a, power_b, power_ab, amperage_a, amperage_b, powerA, powerB, amperageA, amperageB)
+ *  ver. 2.2.1 2026-11-04 Dr.Fiero - fixed PJ-1203A total power (DP 115 / power_ab) flipping negative; updated importUrl to PowerPanel repo
  *
  *                                 TODO: update first post w/ TS0001 _TZ3000_kqvb5akv
  *                                 TODO: add toggle() command
@@ -94,13 +96,13 @@ import groovy.transform.Field
 import hubitat.zigbee.zcl.DataType
 import groovy.transform.CompileStatic
 
-static String version() { '2.1.1' }
-static String timeStamp() { '2026/08/29 05:55 PM' }
+static String version() { '2.2.1' }
+static String timeStamp() { '2026/11/04 03:30 PM' }
 
 @Field static final Boolean _DEBUG = false
 
 metadata {
-    definition(name: 'Tuya Zigbee Metering Plug (Dual Phase)', namespace: 'kkossev', author: 'Krassimir Kossev', importUrl: 'https://raw.githubusercontent.com/kkossev/Hubitat/development/Drivers/Tuya%20Zigbee%20Metering%20Plug/Tuya%20Zigbee%20Metering%20Plug', singleThreaded: true ) {
+    definition(name: 'Tuya Zigbee Metering Plug (Dual Phase)', namespace: 'kkossev', author: 'Krassimir Kossev', importUrl: 'https://raw.githubusercontent.com/drfiero-afaik/PowerPanel/main/Tuya_Zigbee_Metering_Plug.groovy', singleThreaded: true ) {
         capability 'EnergyMeter'
         capability 'PowerMeter'
         capability 'CurrentMeter'

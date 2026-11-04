@@ -1,3 +1,4 @@
+// PanelPower - DashboardView.swift (v1.1.0)
 import SwiftUI
 
 public struct DashboardView: View {
@@ -7,6 +8,10 @@ public struct DashboardView: View {
     @State private var displayUnit: DisplayUnit = .watts
     @State private var showingSettings: Bool = false
     @State private var showingQuitConfirmation: Bool = false
+    
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.0"
+    }
     
     public init() {}
     
@@ -48,8 +53,13 @@ public struct DashboardView: View {
                 .font(.system(size: 16))
             
             VStack(alignment: .leading, spacing: 1) {
-                Text("PanelPower")
-                    .font(.system(size: 13, weight: .bold))
+                HStack(spacing: 4) {
+                    Text("PanelPower")
+                        .font(.system(size: 13, weight: .bold))
+                    Text("v\(appVersion)")
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
                 Text("Main Service Monitor")
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
