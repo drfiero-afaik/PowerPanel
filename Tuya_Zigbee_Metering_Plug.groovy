@@ -1481,12 +1481,13 @@ void parseZHAcommand(Map descMap) {
                                     voltageEvent((zigbee.convertHexToInt(descMap.data[7]) + zigbee.convertHexToInt(descMap.data[6]) * 256) / (getVoltageDiv() as Float))
                                 }
                                 else if (isPJ1203A()) { // power_a divideBy10]
-                                    BigDecimal pA = (value / getPowerDiv() as BigDecimal).setScale(1, BigDecimal.ROUND_HALF_UP)
+                                    BigDecimal pA = (Math.abs(value) / getPowerDiv() as BigDecimal).setScale(1, BigDecimal.ROUND_HALF_UP)
                                     logInfo "(101) PJ1203A power_a : ${pA} W raw ($value)"
                                     sendEvent(name: 'power_a', value: pA, unit: 'W', descriptionText: "Phase A Power is ${pA} W")
                                     sendEvent(name: 'powerA', value: pA, unit: 'W')
                                     BigDecimal pB = (device.currentValue('power_b') ?: device.currentValue('powerB') ?: 0.0) as BigDecimal
-                                    BigDecimal pTotal = pA + pB
+                                    BigDecimal pTotal = (pA + pB).setScale(1, BigDecimal.ROUND_HALF_UP)
+                                    sendEvent(name: 'power_ab', value: pTotal, unit: 'W', descriptionText: "Total Power A+B is ${pTotal} W")
                                     powerEvent(pTotal)
                                 }
                                 else if (isSPM01()) {
@@ -1545,12 +1546,13 @@ void parseZHAcommand(Map descMap) {
                                     sendEvent(name:'temperature', value:value, unit:'C')
                                 }
                                 else if (isPJ1203A()) { // power_b divideBy10]
-                                    BigDecimal pB = (value / getPowerDiv() as BigDecimal).setScale(1, BigDecimal.ROUND_HALF_UP)
+                                    BigDecimal pB = (Math.abs(value) / getPowerDiv() as BigDecimal).setScale(1, BigDecimal.ROUND_HALF_UP)
                                     logInfo "(105) PJ1203A power_b : ${pB} W raw ($value)"
                                     sendEvent(name: 'power_b', value: pB, unit: 'W', descriptionText: "Phase B Power is ${pB} W")
                                     sendEvent(name: 'powerB', value: pB, unit: 'W')
                                     BigDecimal pA = (device.currentValue('power_a') ?: device.currentValue('powerA') ?: 0.0) as BigDecimal
-                                    BigDecimal pTotal = pA + pB
+                                    BigDecimal pTotal = (pA + pB).setScale(1, BigDecimal.ROUND_HALF_UP)
+                                    sendEvent(name: 'power_ab', value: pTotal, unit: 'W', descriptionText: "Total Power A+B is ${pTotal} W")
                                     powerEvent(pTotal)
                                 }
                                 else {
@@ -1645,7 +1647,7 @@ void parseZHAcommand(Map descMap) {
                                 break
                             case '73' : // (115) isPJ1203A() Total Power
                                 if (isPJ1203A()) {
-                                    BigDecimal pAB = (value / getPowerDiv() as BigDecimal).setScale(1, BigDecimal.ROUND_HALF_UP)
+                                    BigDecimal pAB = (Math.abs(value) / getPowerDiv() as BigDecimal).setScale(1, BigDecimal.ROUND_HALF_UP)
                                     logInfo "(115) PJ1203A power_ab : ${pAB} W raw ($value)"
                                     sendEvent(name: 'power_ab', value: pAB, unit: 'W', descriptionText: "Total Power A+B is ${pAB} W")
                                     powerEvent(pAB)
