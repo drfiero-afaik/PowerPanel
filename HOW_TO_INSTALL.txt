@@ -1,0 +1,71 @@
+====================================================================
+                  PANELPOWER - EASY 3-STEP SETUP
+====================================================================
+
+What's in this folder:
+  1. PanelPower.app                   -> The Mac Menu Bar App
+  2. Tuya_Zigbee_Metering_Plug.groovy -> The Hubitat Driver (if needed)
+  3. HOW_TO_INSTALL.txt               -> This guide
+
+
+--------------------------------------------------------------------
+STEP 1: INSTALL THE MAC APP
+--------------------------------------------------------------------
+1. Drag "PanelPower.app" into your Mac's "Applications" folder.
+2. Open your Applications folder, RIGHT-CLICK (or Control-click) on
+   "PanelPower.app" and choose "Open".
+   (Note: Because this is a free community app and not from the Mac
+   App Store, macOS may ask you to confirm opening it the first time.
+   If macOS Sequoia blocks it, go to System Settings -> Privacy &
+   Security -> scroll down and click "Open Anyway".)
+3. Look at the top-right Menu Bar on your Mac screen — you will now
+   see a lightning bolt icon (⚡) with live demo numbers!
+
+
+--------------------------------------------------------------------
+STEP 2: INSTALL THE HUBITAT DRIVER (SKIP IF USING HOME ASSISTANT)
+--------------------------------------------------------------------
+If your Zigbee CT Clamp meter is paired to a Hubitat Elevation hub:
+
+1. Open your Hubitat web page in your browser.
+2. In the left sidebar, click "Drivers Code" (under Developer Tools).
+3. Click "+ New Driver" in the top right.
+4. Click the "Import" button at the top of the screen, paste this
+   link, and click Import:
+   https://raw.githubusercontent.com/drfiero-afaik/PowerPanel/main/Tuya_Zigbee_Metering_Plug.groovy
+   (Or open "Tuya_Zigbee_Metering_Plug.groovy" from this folder in
+   TextEdit, copy all the text, and paste it in.)
+5. Click "Save" in the top right.
+6. Go to "Devices" in Hubitat, click on your Zigbee Energy Meter,
+   scroll to the "Type" dropdown, select "Tuya Zigbee Metering Plug",
+   and click "Save Device".
+7. Look at your browser's address bar while on that device's page —
+   the number at the very end of the URL (for example, /device/edit/693)
+   is your Device ID (e.g. 693). Write that number down!
+
+
+--------------------------------------------------------------------
+STEP 3: CONNECT PANELPOWER TO YOUR HUB
+--------------------------------------------------------------------
+1. Click the lightning bolt (⚡) in your Mac's top Menu Bar.
+2. Click the small Gear icon (⚙️) in the bottom-right corner of the
+   popup window.
+3. Choose your setup:
+   - For Hubitat:
+     * Click "Hubitat (Direct)" at the top.
+     * Enter your Hubitat IP address (example: http://192.168.1.50).
+     * Enter the Device ID number from Step 2 (example: 693).
+   - For Home Assistant:
+     * Click "Home Assistant" at the top.
+     * Enter your Home Assistant URL and Long-Lived Access Token, then
+       click "Auto-Discover Sensors".
+4. Click "Test Connection", then click "Done".
+
+
+--------------------------------------------------------------------
+OPTIONAL: START AUTOMATICALLY WHEN YOU LOG IN
+--------------------------------------------------------------------
+1. Open macOS "System Settings" -> "General" -> "Login Items".
+2. Click the "+" button under "Open at Login".
+3. Select "PanelPower" from your Applications folder.
+====================================================================
