@@ -12,7 +12,7 @@ Built for macOS 14+ (Sonoma, Sequoia, Tahoe) on both **Apple Silicon (M-Series /
 
 You do **not** need to download all the code files listed above. Just grab the single all-in-one `.zip` bundle for your Mac below, which includes the ready-to-run **Mac App (`v1.1.1`)**, the **Hubitat Driver (`v2.2.2`)**, and a simple setup guide:
 
-- 🍏 **Apple Silicon Macs (M1 / M2 / M3 / M4 / M5 / M6 — ARM64):**
+- 🍏 **Apple Silicon Macs (M1 / M2 / M4 / M5 / M6 — ARM64):**
   👉 [**Click Here to Download `PanelPower-macOS-ARM-v1.1.1.zip`**](https://github.com/drfiero-afaik/PowerPanel/raw/main/PanelPower-macOS-ARM-v1.1.1.zip)
 - 💻 **Intel Macs (`x86_64`):**
   👉 [**Click Here to Download `PanelPower-macOS-Intel-v1.1.1.zip`**](https://github.com/drfiero-afaik/PowerPanel/raw/main/PanelPower-macOS-Intel-v1.1.1.zip)
