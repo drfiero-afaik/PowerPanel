@@ -502,7 +502,8 @@ public class HomeAssistantService: ObservableObject {
                 self.listenWebSocket(task)
                 
             case .failure(let error):
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
                     if self.settings.dataSource == .hubitat && !self.settings.demoMode {
                         self.lastError = "EventSocket: \(error.localizedDescription)"
                         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in

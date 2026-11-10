@@ -1,23 +1,26 @@
 # PanelPower ⚡
 
-**Current Versions:** Mac App **`v1.1.0`** | Hubitat Driver **`v2.2.2`** *(Updated 2026-11-04)*
+**Current Versions:** Mac App **`v1.1.1`** | Hubitat Driver **`v2.2.2`** *(Updated 2026-11-10)*
 
 A native, lightweight macOS Menu Bar app for monitoring **Phase A**, **Phase B**, and **Total Panel Power** from Zigbee current transformers (CT clamps) connected to **Hubitat Elevation** or **Home Assistant**.
 
-Built for macOS 14 (Sonoma) and macOS 15 (Sequoia).
+Built for macOS 14+ (Sonoma, Sequoia, Tahoe) on both **Apple Silicon (M-Series / ARM)** and **Intel (`x86_64`)** Macs.
 
 ---
 
 ## 📥 Easy Download & 3-Step Setup (Start Here!)
 
-You do **not** need to download all the code files listed above. Just grab the single all-in-one `.zip` bundle below, which includes the ready-to-run **Mac App (`v1.1.0`)**, the **Hubitat Driver (`v2.2.2`)**, and a simple setup guide:
+You do **not** need to download all the code files listed above. Just grab the single all-in-one `.zip` bundle for your Mac below, which includes the ready-to-run **Mac App (`v1.1.1`)**, the **Hubitat Driver (`v2.2.2`)**, and a simple setup guide:
 
-### 👉 [**Click Here to Download `PanelPower-macOS-v1.1.0.zip`**](https://github.com/drfiero-afaik/PowerPanel/raw/main/PanelPower-macOS-v1.1.0.zip)
+- 🍏 **Apple Silicon Macs (M1 / M2 / M3 / M4 / M5 / M6 — ARM64):**
+  👉 [**Click Here to Download `PanelPower-macOS-ARM-v1.1.1.zip`**](https://github.com/drfiero-afaik/PowerPanel/raw/main/PanelPower-macOS-ARM-v1.1.1.zip)
+- 💻 **Intel Macs (`x86_64`):**
+  👉 [**Click Here to Download `PanelPower-macOS-Intel-v1.1.1.zip`**](https://github.com/drfiero-afaik/PowerPanel/raw/main/PanelPower-macOS-Intel-v1.1.1.zip)
 
 ---
 
 ### Step 1: Install the Mac App
-1. Double-click **`PanelPower-macOS.zip`** in your `Downloads` folder to unzip it.
+1. Double-click the downloaded **`PanelPower-macOS-ARM-v1.1.1.zip`** (or **`PanelPower-macOS-Intel-v1.1.1.zip`**) in your `Downloads` folder to unzip it.
 2. Drag **`PanelPower.app`** into your Mac's **Applications** folder.
 3. **First-time launch:** Open your **Applications** folder, **Right-Click** (or Control-click) on **`PanelPower.app`** and select **Open**.
    > *Why right-click? Because this is a free community app rather than a paid Mac App Store app, macOS will ask you to confirm opening it the first time. (On macOS Sequoia, if prompted, open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**).*
@@ -92,4 +95,4 @@ If you modify any of the Swift source files in `src/`:
 cd PanelPower
 ./build.sh
 ```
-This compiles `PanelPower.app`, signs it, updates `PanelPower-macOS.zip`, and installs a copy into `/Applications/PanelPower.app`.
+This compiles `PanelPower.app` for both Intel (`x86_64`) and Apple Silicon (`arm64`), signs each bundle, updates `PanelPower-macOS-Intel-v1.1.1.zip` and `PanelPower-macOS-ARM-v1.1.1.zip`, and installs the native architecture copy into `/Applications/PanelPower.app`.

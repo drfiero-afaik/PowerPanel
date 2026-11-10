@@ -1,4 +1,4 @@
-// PanelPower - DashboardView.swift (v1.1.0)
+// PanelPower - DashboardView.swift (v1.1.1)
 import SwiftUI
 
 public struct DashboardView: View {
@@ -10,7 +10,7 @@ public struct DashboardView: View {
     @State private var showingQuitConfirmation: Bool = false
     
     private var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.0"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.1"
     }
     
     public init() {}
