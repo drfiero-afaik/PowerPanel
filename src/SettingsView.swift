@@ -119,6 +119,9 @@ public struct SettingsView: View {
             self.isTesting = false
             self.testSuccess = success
             self.testStatus = msg
+            if success {
+                self.service.startPolling()
+            }
         }
     }
     
@@ -395,6 +398,9 @@ public struct SettingsView: View {
             self.isTesting = false
             self.testSuccess = success
             self.testStatus = message
+            if success {
+                self.service.startPolling()
+            }
         }
     }
 }

@@ -45,6 +45,15 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.updateMenuBarTitle(reading: reading, format: format)
             }
             .store(in: &cancellables)
+            
+        // Reconnect and refresh automatically when Mac wakes from sleep
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.service.startPolling()
+        }
     }
     
     private func updateMenuBarTitle(reading: PowerReading, format: MenuBarFormat) {

@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import Network
 
 public class HomeAssistantService: ObservableObject {
     public static let shared = HomeAssistantService()
@@ -16,6 +17,10 @@ public class HomeAssistantService: ObservableObject {
     private let settings = AppSettings.shared
     private var cancellables = Set<AnyCancellable>()
     private var webSocketTask: URLSessionWebSocketTask?
+    private var lastWebSocketActivity: Date = .distantPast
+    private var reconnectWorkItem: DispatchWorkItem?
+    private let pathMonitor = NWPathMonitor()
+    private let pathMonitorQueue = DispatchQueue(label: "com.panelpower.networkMonitor")
     
     // Hubitat cache
     private var hubitatWattsA: Double = 0
@@ -33,6 +38,7 @@ public class HomeAssistantService: ObservableObject {
     
     public init() {
         startPolling()
+        setupNetworkMonitor()
         
         // Restart polling if refresh interval or demo mode changes
         settings.$refreshInterval
@@ -54,6 +60,25 @@ public class HomeAssistantService: ObservableObject {
             .dropFirst()
             .sink { [weak self] _ in self?.startPolling() }
             .store(in: &cancellables)
+            
+        settings.$hubitatURL
+            .dropFirst()
+            .sink { [weak self] _ in self?.startPolling() }
+            .store(in: &cancellables)
+    }
+    
+    private func setupNetworkMonitor() {
+        pathMonitor.pathUpdateHandler = { [weak self] path in
+            if path.status == .satisfied {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                    guard let self = self else { return }
+                    if !self.isConnected || Date().timeIntervalSince(self.lastWebSocketActivity) > 10.0 {
+                        self.startPolling()
+                    }
+                }
+            }
+        }
+        pathMonitor.start(queue: pathMonitorQueue)
     }
     
     public func startPolling() {
@@ -149,7 +174,6 @@ public class HomeAssistantService: ObservableObject {
     }
     
     public func fetchHubitatData() {
-        // If Maker API is configured, poll device details
         let appID = settings.hubitatMakerAppID.trimmingCharacters(in: .whitespacesAndNewlines)
         let token = settings.hubitatMakerToken.trimmingCharacters(in: .whitespacesAndNewlines)
         let devID = settings.hubitatDeviceID.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -159,9 +183,21 @@ public class HomeAssistantService: ObservableObject {
             return
         }
         
-        // Ensure WebSocket is connected for live pushes
+        // Ensure WebSocket is connected and responsive for live pushes
         if webSocketTask == nil || webSocketTask?.state != .running {
             connectHubitatWebSocket()
+        } else if Date().timeIntervalSince(lastWebSocketActivity) > 10.0 {
+            webSocketTask?.sendPing { [weak self] error in
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    if error != nil {
+                        self.isConnected = false
+                        self.connectHubitatWebSocket()
+                    } else {
+                        self.lastWebSocketActivity = Date()
+                    }
+                }
+            }
         }
         
         // Sample current live reading into history at a steady, rhythmic cadence
@@ -187,6 +223,42 @@ public class HomeAssistantService: ObservableObject {
                     }
                 }
             }.resume()
+        } else if !devID.isEmpty {
+            // Poll Hubitat's built-in /device/fullJson/<id> endpoint on startup or when WebSocket is quiet
+            let needsPoll = (currentReading == .empty) || !isConnected || (Date().timeIntervalSince(lastWebSocketActivity) > max(4.0, settings.refreshInterval * 2.0))
+            if needsPoll {
+                let fullJsonURL = baseURL.appendingPathComponent("device/fullJson/\(devID)")
+                var req = URLRequest(url: fullJsonURL)
+                req.timeoutInterval = 4.0
+                
+                URLSession.shared.dataTask(with: req) { [weak self] data, response, error in
+                    guard let self = self,
+                          let data = data,
+                          let http = response as? HTTPURLResponse,
+                          http.statusCode == 200,
+                          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                          let device = root["device"] as? [String: Any],
+                          let currentStates = device["currentStates"] as? [String: Any] else { return }
+                    
+                    func extractDouble(_ key: String) -> Double? {
+                        guard let stateObj = currentStates[key] as? [String: Any],
+                              let rawVal = stateObj["value"] else { return nil }
+                        if let d = rawVal as? Double { return d }
+                        if let i = rawVal as? Int { return Double(i) }
+                        if let s = rawVal as? String { return Double(s) }
+                        return nil
+                    }
+                    
+                    DispatchQueue.main.async {
+                        let orderedKeys = ["voltage", "power_a", "power_b", "amperage_a", "amperage_b", "power", "amperage"]
+                        for key in orderedKeys {
+                            if let val = extractDouble(key) {
+                                self.applyHubitatValue(name: key, value: val)
+                            }
+                        }
+                    }
+                }.resume()
+            }
         }
     }
     
@@ -457,6 +529,8 @@ public class HomeAssistantService: ObservableObject {
     
     // MARK: - Hubitat Direct Integration
     public func connectHubitatWebSocket() {
+        reconnectWorkItem?.cancel()
+        reconnectWorkItem = nil
         disconnectHubitatWebSocket()
         
         guard let url = URL(string: settings.hubitatURL.trimmingCharacters(in: .whitespacesAndNewlines)),
@@ -468,17 +542,21 @@ public class HomeAssistantService: ObservableObject {
         let port = url.port ?? 80
         guard let wsURL = URL(string: "ws://\(host):\(port)/eventsocket") else { return }
         
-        let session = URLSession(configuration: .default)
+        let config = URLSessionConfiguration.default
+        config.waitsForConnectivity = false
+        let session = URLSession(configuration: config)
         let task = session.webSocketTask(with: wsURL)
         self.webSocketTask = task
+        self.lastWebSocketActivity = Date()
         task.resume()
         
-        self.isConnected = true
         self.lastError = nil
         listenWebSocket(task)
     }
     
     public func disconnectHubitatWebSocket() {
+        reconnectWorkItem?.cancel()
+        reconnectWorkItem = nil
         webSocketTask?.cancel(with: .goingAway, reason: nil)
         webSocketTask = nil
     }
@@ -489,6 +567,11 @@ public class HomeAssistantService: ObservableObject {
             
             switch result {
             case .success(let message):
+                DispatchQueue.main.async {
+                    self.lastWebSocketActivity = Date()
+                    self.isConnected = true
+                    self.lastError = nil
+                }
                 switch message {
                 case .string(let text):
                     if let data = text.data(using: .utf8) {
@@ -502,15 +585,20 @@ public class HomeAssistantService: ObservableObject {
                 self.listenWebSocket(task)
                 
             case .failure(let error):
-                DispatchQueue.main.async { [weak self] in
-                    guard let self = self else { return }
+                DispatchQueue.main.async { [weak self, weak task] in
+                    guard let self = self, self.webSocketTask === task else { return }
+                    self.webSocketTask = nil
+                    self.isConnected = false
                     if self.settings.dataSource == .hubitat && !self.settings.demoMode {
                         self.lastError = "EventSocket: \(error.localizedDescription)"
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                        self.reconnectWorkItem?.cancel()
+                        let item = DispatchWorkItem { [weak self] in
                             if self?.settings.dataSource == .hubitat {
                                 self?.connectHubitatWebSocket()
                             }
                         }
+                        self.reconnectWorkItem = item
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: item)
                     }
                 }
             }

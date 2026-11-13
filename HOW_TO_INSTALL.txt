@@ -1,10 +1,10 @@
 ====================================================================
                   PANELPOWER - EASY 3-STEP SETUP
-        Mac App: v1.1.1  |  Hubitat Driver: v2.2.2 (2026-11-10)
+        Mac App: v1.1.2  |  Hubitat Driver: v2.2.2 (2026-11-13)
 ====================================================================
 
 What's in this folder:
-  1. PanelPower.app                          -> The Mac Menu Bar App (v1.1.1)
+  1. PanelPower.app                          -> The Mac Menu Bar App (v1.1.2)
   2. Tuya_Zigbee_Metering_Plug_v2.2.2.groovy -> The Hubitat Driver (v2.2.2)
   3. HOW_TO_INSTALL.txt                      -> This guide
 

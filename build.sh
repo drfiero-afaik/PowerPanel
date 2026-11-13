@@ -5,7 +5,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$DIR/PanelPower.app"
 MACOS_DIR="$APP_DIR/Contents/MacOS"
 RESOURCES_DIR="$APP_DIR/Contents/Resources"
-APP_VERSION="v1.1.1"
+APP_VERSION="v1.1.2"
 DRIVER_VERSION="v2.2.2"
 SDK_PATH="$(xcrun --show-sdk-path)"
 
